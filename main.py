@@ -147,8 +147,17 @@ def to_chart_js(name, results):
         }
     }
 
-    c = urllib.parse.quote_plus(json.dumps(chart))
-    return f"https://quickchart.io/chart?c={c}"
+    chart_io_request = {'w': 750, 'h': 450, 'chart': chart}
+
+    response = requests.post("https://quickchart.io/chart/create", json=chart_io_request)
+    if response.status_code != 200:
+        print('Error:', response.text)
+        quit()
+    else:
+        chart_response = response.json()
+        print(chart_response)
+        return chart_response['url']
+
 
 
 def send_plots_to_slack(hook, results, files, channel):
@@ -168,20 +177,22 @@ def send_plots_to_slack(hook, results, files, channel):
             } for r in results]
     }
 
-    requests.post(hook, json=data)
+    response = requests.post(hook, json=data)
+    print(f"response = {response.status_code}")
+    if response.status_code != 200:
+        print(response.text)
 
 
 def main():
     args = parse_arguments()
     results = load_performance_tests(getattr(args, 'server.endpoint'), getattr(args, 'server.user'),
                                      not getattr(args, 'server.no_verify_tls'), args.verbose)
-    print(results)
+    print(f"Received {len(results)} test cases")
     charts = {}
     for result in results:
         url = to_chart_js(result['name'], result['latest_results'])
-        print(url)
         charts[result['name']] = url
-
+    print("sending slack message")
     send_plots_to_slack(getattr(args, 'slack.web_hook'), results, charts,
                         getattr(args, 'slack.channel_id'))
 
