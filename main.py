@@ -11,6 +11,8 @@ import urllib3
 import requests
 import matplotlib.pyplot as plt
 
+from outliers import create_dataframe, check_last_run, sequence_chow_test
+
 urllib3.disable_warnings()
 plt.style.use('dark_background')
 
@@ -49,7 +51,7 @@ for doc in rlog
     let latest_results = (
         for doc in rlog
             filter doc.name == name
-            sort doc.date
+            sort doc.date desc
             limit 50
             return {date: doc.date, values: doc.result, config: doc.test})
             
@@ -188,6 +190,11 @@ def main():
     results = load_performance_tests(getattr(args, 'server.endpoint'), getattr(args, 'server.user'),
                                      not getattr(args, 'server.no_verify_tls'), args.verbose)
     print(f"Received {len(results)} test cases")
+    df = create_dataframe(results)
+    print(f"Checking if last benchmark of insert-c10-r3-wc2-ws rps was unusual: "
+          f"{check_last_run(df, 'insert-c10-r3-wc2-ws', 'rps')}")
+    print(f"Timestamps which might have been the start of a structural break: "
+          f"{sequence_chow_test(df, 'insert-c10-r3-wc2-ws', 'rps')}")
     charts = {}
     for result in results:
         url = to_chart_js(result['name'], result['latest_results'])
